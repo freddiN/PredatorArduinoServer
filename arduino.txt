@@ -1,0 +1,176 @@
+#include <Servo.h> 
+
+// PIN Belegung für Servos und LEDs
+const int nPinServoX = 2;
+const int nPinServoY = 3;
+
+const int nPinLED1 = 10;
+const int nPinLED2 = 11;
+const int nPinLED3 = 12;
+
+Servo ServoX; 
+Servo ServoY; 
+
+const long interval = 35; // alle X ms wird weitergemacht
+
+long previousMillis = 0;
+
+int nLED1Step = -1;
+int nLED2Step = -1;
+int nLED3Step = -1;
+
+String strCommand = "";
+
+void setup() {
+  pinMode(nPinLED1, OUTPUT);      
+  pinMode(nPinLED2, OUTPUT);      
+  pinMode(nPinLED3, OUTPUT);
+ 
+  ServoX.attach(nPinServoX);
+  ServoY.attach(nPinServoY); 
+  
+  Serial.begin(9600);   //für Debug/SerialMonitor
+  //Serial1.begin(9600);  //RS232 Schnittstelle
+  Serial3.begin(9600);  //Bluetooth
+}
+
+void loop() {
+  unsigned long currentMillis = millis();
+
+  if(currentMillis - previousMillis > interval) {
+    previousMillis = currentMillis;
+    
+    char ch = handleSerial();
+    if (ch == '!') {
+      Serial.print("Command: ");
+      Serial.print(strCommand);
+      Serial.print("\r\n");
+      Serial3.print("Command: ");
+      Serial3.print(strCommand);
+      Serial3.print("\r\n");
+      
+      if (strCommand == "LED1" || strCommand == "led1"){
+        nLED1Step = handleLED(nPinLED1, nLED1Step);
+      } else if (strCommand == "LED2" || strCommand == "led2"){
+        nLED2Step = handleLED(nPinLED2, nLED2Step);
+      } else if (strCommand == "LED3" || strCommand == "led3"){
+        nLED3Step = handleLED(nPinLED3, nLED3Step);
+      } else if (strCommand.startsWith("SERVO") || strCommand.startsWith("servo")){ //SERVOX123, SERVOY005
+        handleServo(strCommand.substring(5, 6), strCommand.substring(6));
+      } else {
+        Serial.print("Ubekannte Nachricht: ");
+        Serial.print(strCommand);
+        Serial.print("\r\n");
+        Serial3.print("Ubekannte Nachricht: ");
+        Serial3.print(strCommand);
+        Serial3.print("\r\n");
+      }
+      
+      strCommand = "";
+    } else if (ch == '-'){
+      // nix zurückgelommen
+    } else {
+      strCommand += ch;
+    }
+    
+    if (nLED1Step >= 0) {
+      nLED1Step = performLEDFade(nPinLED1, nLED1Step);
+    }
+    
+    if (nLED2Step >= 0) {
+      nLED2Step = performLEDFade(nPinLED2, nLED2Step);
+    }
+    
+    if (nLED3Step >= 0) {
+      nLED3Step = performLEDFade(nPinLED3, nLED3Step);
+    }
+  }
+}
+
+char handleSerial() {
+  char chReturn = '-';
+  if (Serial3.available() > 0) {
+      chReturn = Serial3.read();
+      Serial3.print("Blueetooth: ");
+      Serial3.print(chReturn);
+      Serial3.print("\r\n");
+  }
+  
+  if (Serial.available() > 0) {
+      chReturn = Serial.read();
+      Serial.print("Serial Monitor: ");
+      Serial.print(chReturn);
+      Serial.print("\r\n");
+    }
+    
+  return chReturn;
+}
+
+int performLEDFade(int nPin, int nStep) {
+  int nStepSize = 5;
+    
+  if (nStep >= 0 && nStep <= 255) {
+    analogWrite(nPin, nStep);
+    return (nStep + nStepSize);
+  } else if (nStep > 255 && nStep <= 510) {
+    int nHelligkeit = 510 - nStep;
+    analogWrite(nPin, nHelligkeit);
+    return (nStep + nStepSize);
+  } else {
+   return -1; 
+  } 
+}
+
+int handleLED(int nPin, int nStep) {
+  Serial.print("HandleLED PIN=");
+  Serial.print(nPin);
+  Serial.print(" Step=");
+  Serial.print(nStep);
+  Serial.print("\r\n");
+  
+  Serial3.print("HandleLED PIN=");
+  Serial3.print(nPin);
+  Serial3.print(" Step=");
+  Serial3.print(nStep);
+  Serial3.print("\r\n");
+  
+  if (nStep < 0) {
+    return 0; //aktiviert den Lauf
+  } else {
+    analogWrite(nPin, 0);
+    return -1;
+  }
+}
+
+void handleServo(String strXY, String strGrad) {
+  int nGrad = strGrad.toInt();
+  
+  // 10 = links von Predator aus gesehen
+  if ((strXY == "X" || strXY == "x") &&
+     (nGrad >= 10 && nGrad <= 170)) {
+          ServoX.write(nGrad);
+      }
+  //10 = unten
+  if ((strXY == "Y" || strXY == "y") &&
+     (nGrad >= 60 && nGrad <= 100)) {
+          ServoY.write(nGrad);
+      }
+    
+  Serial.print("HandleServo XY=");
+  Serial.print(strXY);
+  Serial.print(" Grad=");
+  Serial.print(strGrad);
+  
+  Serial.print(" Grad(Int)=");
+  Serial.print(nGrad);
+  Serial.print("\r\n");
+  
+  Serial3.print("HandleServo XY=");
+  Serial3.print(strXY);
+  Serial3.print(" Grad=");
+  Serial3.print(strGrad);
+  
+  Serial3.print(" Grad(Int)=");
+  Serial3.print(nGrad);
+  Serial3.print("\r\n");
+}
